@@ -94,14 +94,29 @@ func (s *scanner) scanToken() {
 		} else {
 			s.addToken(Greater)
 		}
+
 	case '/':
 		if s.match('/') {
 			for s.peek() != '\n' && !s.atEnd() {
 				s.advance()
 			}
+		} else if s.match('*') {
+			for !(s.peek() == '*' && s.peekNext() == '/') && !s.atEnd() {
+				if s.peek() == '\n' {
+					s.line++
+				}
+				s.advance()
+			}
+			if s.atEnd() {
+				report(s.line, "unterminated /**/ comment")
+				break
+			}
+			s.advance() // skip *
+			s.advance() // skip /
 		} else {
 			s.addToken(Slash)
 		}
+
 	case ' ', '\r', '\t':
 		break
 	case '\n':
