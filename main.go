@@ -52,13 +52,27 @@ func run(source string) {
 	for _, t := range tokens {
 		fmt.Println("token ", t)
 	}
+	p := &Parser{tokens, 0}
+	expr := p.parse()
+
+	if hadError {
+		return
+	}
+	fmt.Printf("expr = %+v\n", printAST(expr))
 }
 
 func report(line int, msg string) {
-	reportWhere(line, "", msg)
+	reportLoc(line, "", msg)
 }
 
-func reportWhere(line int, where, msg string) {
+func reportToken(t *tokenObj, msg string) {
+	if t.tok == EOF {
+		reportLoc(t.line, " at end", msg)
+	} else {
+		reportLoc(t.line, " at '"+t.lexeme+"'", msg)
+	}
+}
+func reportLoc(line int, where, msg string) {
 	fmt.Printf("[line %v] Error%v: %v\n", line, where, msg)
 	hadError = true
 }
