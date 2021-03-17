@@ -43,7 +43,7 @@ func (s *Scanner) scan() []*tokenObj {
 		s.scanToken()
 	}
 
-	s.tokens = append(s.tokens, &tokenObj{typ: EOF})
+	s.tokens = append(s.tokens, &tokenObj{tok: EOF})
 	return s.tokens
 }
 
@@ -51,48 +51,48 @@ func (s *Scanner) scanToken() {
 	ch := s.advance()
 	switch ch {
 	case '(':
-		s.addToken(LeftParen)
+		s.token(LeftParen)
 	case ')':
-		s.addToken(RightParen)
+		s.token(RightParen)
 	case '{':
-		s.addToken(LeftBrace)
+		s.token(LeftBrace)
 	case '}':
-		s.addToken(RightBrace)
+		s.token(RightBrace)
 	case ',':
-		s.addToken(Comma)
+		s.token(Comma)
 	case '.':
-		s.addToken(Dot)
+		s.token(Dot)
 	case '-':
-		s.addToken(Minus)
+		s.token(Minus)
 	case '+':
-		s.addToken(Plus)
+		s.token(Plus)
 	case ';':
-		s.addToken(Semicolon)
+		s.token(Semicolon)
 	case '*':
-		s.addToken(Star)
+		s.token(Star)
 	case '!':
 		if s.match('=') {
-			s.addToken(BangEqual)
+			s.token(BangEqual)
 		} else {
-			s.addToken(Bang)
+			s.token(Bang)
 		}
 	case '=':
 		if s.match('=') {
-			s.addToken(EqualEqual)
+			s.token(EqualEqual)
 		} else {
-			s.addToken(Equal)
+			s.token(Equal)
 		}
 	case '<':
 		if s.match('=') {
-			s.addToken(LessEqual)
+			s.token(LessEqual)
 		} else {
-			s.addToken(Less)
+			s.token(Less)
 		}
 	case '>':
 		if s.match('=') {
-			s.addToken(GreaterEqual)
+			s.token(GreaterEqual)
 		} else {
-			s.addToken(Greater)
+			s.token(Greater)
 		}
 	case '/':
 		if s.match('/') {
@@ -102,14 +102,14 @@ func (s *Scanner) scanToken() {
 		} else if s.match('*') {
 			s.fullComment()
 		} else {
-			s.addToken(Slash)
+			s.token(Slash)
 		}
 	case ' ', '\r', '\t':
 		break
 	case '\n':
 		s.line++
 	case '"':
-		s.readString()
+		s.stringLit()
 	default:
 		if isDigit(ch) {
 			s.number()
@@ -167,21 +167,21 @@ func (s *Scanner) peekNext() byte {
 	return s.source[s.current+1]
 }
 
-func (s *Scanner) addToken(t token) {
-	s.addLiteral(t, nil)
+func (s *Scanner) token(t token) {
+	s.literal(t, nil)
 }
 
-func (s *Scanner) addLiteral(t token, literal interface{}) {
+func (s *Scanner) literal(t token, literal interface{}) {
 	lex := s.source[s.start:s.current]
 	s.tokens = append(s.tokens, &tokenObj{
-		typ:     t,
+		tok:     t,
 		lexeme:  lex,
 		literal: literal,
 		line:    s.line,
 	})
 }
 
-func (s *Scanner) readString() {
+func (s *Scanner) stringLit() {
 	for s.peek() != '"' && !s.atEnd() {
 		if s.peek() == '\n' {
 			s.line++
@@ -194,7 +194,7 @@ func (s *Scanner) readString() {
 	}
 	s.advance() // skip closing "
 	value := s.source[s.start+1 : s.current-1]
-	s.addLiteral(String, value)
+	s.literal(String, value)
 }
 
 func (s *Scanner) number() {
@@ -211,7 +211,7 @@ func (s *Scanner) number() {
 	if err != nil {
 		report(s.line, "cannot parse float number")
 	}
-	s.addLiteral(Number, val)
+	s.literal(Number, val)
 }
 
 func (s *Scanner) identifier() {
@@ -220,12 +220,12 @@ func (s *Scanner) identifier() {
 	}
 	text := s.source[s.start:s.current]
 	var t token
-	if typ, ok := keywords[text]; ok {
-		t = typ
+	if tok, ok := keywords[text]; ok {
+		t = tok
 	} else {
 		t = Identifier
 	}
-	s.addToken(t)
+	s.token(t)
 }
 
 func (s *Scanner) fullComment() {

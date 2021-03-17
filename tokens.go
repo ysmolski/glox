@@ -55,12 +55,12 @@ const (
 )
 
 type tokenObj struct {
-	typ     token
+	tok     token
 	lexeme  string
 	line    int
 	literal interface{}
 }
 
 func (t *tokenObj) String() string {
-	return fmt.Sprintf("token: %v lex: %v lit: %v", t.typ, t.lexeme, t.literal)
+	return fmt.Sprintf("token: %v lex: %v lit: %v", t.tok, t.lexeme, t.literal)
 }
