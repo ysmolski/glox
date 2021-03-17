@@ -21,7 +21,7 @@ var keywords = map[string]token{
 	"while":  While,
 }
 
-type scanner struct {
+type Scanner struct {
 	source  string
 	tokens  []*tokenObj
 	start   int // start of the lexeme
@@ -29,15 +29,15 @@ type scanner struct {
 	line    int
 }
 
-func NewScanner(source string) *scanner {
-	return &scanner{
+func NewScanner(source string) *Scanner {
+	return &Scanner{
 		source: source,
 		tokens: make([]*tokenObj, 0),
 		line:   1,
 	}
 }
 
-func (s *scanner) scan() []*tokenObj {
+func (s *Scanner) scan() []*tokenObj {
 	for !s.atEnd() {
 		s.start = s.current
 		s.scanToken()
@@ -47,7 +47,7 @@ func (s *scanner) scan() []*tokenObj {
 	return s.tokens
 }
 
-func (s *scanner) scanToken() {
+func (s *Scanner) scanToken() {
 	ch := s.advance()
 	switch ch {
 	case '(':
@@ -94,29 +94,16 @@ func (s *scanner) scanToken() {
 		} else {
 			s.addToken(Greater)
 		}
-
 	case '/':
 		if s.match('/') {
 			for s.peek() != '\n' && !s.atEnd() {
 				s.advance()
 			}
 		} else if s.match('*') {
-			for !(s.peek() == '*' && s.peekNext() == '/') && !s.atEnd() {
-				if s.peek() == '\n' {
-					s.line++
-				}
-				s.advance()
-			}
-			if s.atEnd() {
-				report(s.line, "unterminated /**/ comment")
-				break
-			}
-			s.advance() // skip *
-			s.advance() // skip /
+			s.fullComment()
 		} else {
 			s.addToken(Slash)
 		}
-
 	case ' ', '\r', '\t':
 		break
 	case '\n':
@@ -148,17 +135,17 @@ func isAlphaNum(b byte) bool {
 	return isDigit(b) || isAlpha(b)
 }
 
-func (s *scanner) atEnd() bool {
+func (s *Scanner) atEnd() bool {
 	return s.current >= len(s.source)
 }
 
-func (s *scanner) advance() byte {
+func (s *Scanner) advance() byte {
 	i := s.current
 	s.current++
 	return s.source[i]
 }
 
-func (s *scanner) match(ch byte) bool {
+func (s *Scanner) match(ch byte) bool {
 	if s.peek() != ch {
 		return false
 	}
@@ -166,25 +153,25 @@ func (s *scanner) match(ch byte) bool {
 	return true
 }
 
-func (s *scanner) peek() byte {
+func (s *Scanner) peek() byte {
 	if s.atEnd() {
 		return byte(0)
 	}
 	return s.source[s.current]
 }
 
-func (s *scanner) peekNext() byte {
+func (s *Scanner) peekNext() byte {
 	if s.current+1 >= len(s.source) {
 		return byte(0)
 	}
 	return s.source[s.current+1]
 }
 
-func (s *scanner) addToken(t token) {
+func (s *Scanner) addToken(t token) {
 	s.addLiteral(t, nil)
 }
 
-func (s *scanner) addLiteral(t token, literal interface{}) {
+func (s *Scanner) addLiteral(t token, literal interface{}) {
 	lex := s.source[s.start:s.current]
 	s.tokens = append(s.tokens, &tokenObj{
 		typ:     t,
@@ -194,7 +181,7 @@ func (s *scanner) addLiteral(t token, literal interface{}) {
 	})
 }
 
-func (s *scanner) readString() {
+func (s *Scanner) readString() {
 	for s.peek() != '"' && !s.atEnd() {
 		if s.peek() == '\n' {
 			s.line++
@@ -210,7 +197,7 @@ func (s *scanner) readString() {
 	s.addLiteral(String, value)
 }
 
-func (s *scanner) number() {
+func (s *Scanner) number() {
 	for isDigit(s.peek()) {
 		s.advance()
 	}
@@ -227,7 +214,7 @@ func (s *scanner) number() {
 	s.addLiteral(Number, val)
 }
 
-func (s *scanner) identifier() {
+func (s *Scanner) identifier() {
 	for isAlphaNum(s.peek()) {
 		s.advance()
 	}
@@ -239,4 +226,19 @@ func (s *scanner) identifier() {
 		t = Identifier
 	}
 	s.addToken(t)
+}
+
+func (s *Scanner) fullComment() {
+	for !(s.peek() == '*' && s.peekNext() == '/') && !s.atEnd() {
+		if s.peek() == '\n' {
+			s.line++
+		}
+		s.advance()
+	}
+	if s.atEnd() {
+		report(s.line, "unterminated /**/ comment")
+		return
+	}
+	s.advance() // skip *
+	s.advance() // skip /
 }

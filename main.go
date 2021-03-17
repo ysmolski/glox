@@ -55,10 +55,10 @@ func run(source string) {
 }
 
 func report(line int, msg string) {
-	reportDet(line, "", msg)
+	reportWhere(line, "", msg)
 }
 
-func reportDet(line int, where, msg string) {
+func reportWhere(line int, where, msg string) {
 	fmt.Printf("[line %v] Error%v: %v\n", line, where, msg)
 	hadError = true
 }
