@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -29,7 +30,7 @@ func runFile(file string) {
 	}
 	run(string(data))
 	if hadError {
-		os.Exit(65)
+		os.Exit(1)
 	}
 }
 
@@ -49,16 +50,27 @@ func runPrompt() {
 func run(source string) {
 	scanner := NewScanner(source)
 	tokens := scanner.scan()
-	for _, t := range tokens {
-		fmt.Println("token ", t)
-	}
+	// for _, t := range tokens {
+	// 	fmt.Println("token ", t)
+	// }
 	p := &Parser{tokens, 0}
 	expr := p.parse()
 
 	if hadError {
 		return
 	}
-	fmt.Printf("expr = %+v\n", printAST(expr))
+	// fmt.Printf("ast = %+v\n", printAST(expr))
+
+	// catch runtime error, print and bail
+	defer func() {
+		e := recover()
+		if e != nil {
+			fmt.Println(e)
+			hadError = true
+		}
+	}()
+	val := expr.eval()
+	fmt.Println(val)
 }
 
 func report(line int, msg string) {
@@ -75,4 +87,9 @@ func reportToken(t *tokenObj, msg string) {
 func reportLoc(line int, where, msg string) {
 	fmt.Printf("[line %v] Error%v: %v\n", line, where, msg)
 	hadError = true
+}
+
+func runtimeErr(t *tokenObj, msg string) error {
+	return errors.New(fmt.Sprintf("[line %v] runtime error: %v",
+		t.line, msg))
 }
