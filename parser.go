@@ -5,6 +5,7 @@ import (
 	"fmt"
 )
 
+// Recursive-descent parser
 //
 // expression     -> sequential ;
 // sequential     -> conditional ( "," conditional )* ;
@@ -72,7 +73,7 @@ func (p *Parser) consume(expected token, msg string) *tokenObj {
 
 func (p *Parser) err(t *tokenObj, msg string) error {
 	reportToken(t, msg)
-	return errors.New("parsing error")
+	return errors.New("parsing failed")
 }
 
 func (p *Parser) sync() {
@@ -97,7 +98,7 @@ func (p *Parser) parse() Expr {
 	defer func() {
 		e := recover()
 		if e != nil {
-			fmt.Println("Recovered in parse()", e)
+			fmt.Println(e)
 		}
 	}()
 	return p.expression()
@@ -125,7 +126,7 @@ func (p *Parser) conditional() Expr {
 	if p.match(Question) {
 		op := p.prev()
 		left := p.conditional()
-		p.consume(Colon, "Expect : after expression")
+		p.consume(Colon, "expected ':' after <condition> ? <expression>")
 		right := p.conditional()
 		expr = &TernaryExpr{operator: op, op1: expr, op2: left, op3: right}
 	}
@@ -201,8 +202,8 @@ func (p *Parser) primary() Expr {
 		return &LiteralExpr{value: p.prev().literal}
 	case p.match(LeftParen):
 		expr := p.expression()
-		p.consume(RightParen, "Expect ')' after expression")
+		p.consume(RightParen, "expected enclosing ')' after expression")
 		return &GroupingExpr{e: expr}
 	}
-	panic(p.err(p.peek(), "expect expression"))
+	panic(p.err(p.peek(), "expected expression"))
 }

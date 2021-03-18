@@ -85,7 +85,7 @@ func reportToken(t *tokenObj, msg string) {
 	}
 }
 func reportLoc(line int, where, msg string) {
-	fmt.Printf("[line %v] Error%v: %v\n", line, where, msg)
+	fmt.Printf("[line %v] error%v: %v\n", line, where, msg)
 	hadError = true
 }
 
