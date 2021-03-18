@@ -60,10 +60,14 @@ func (s *Scanner) scanToken() {
 		s.token(RightBrace)
 	case ',':
 		s.token(Comma)
+	case ':':
+		s.token(Colon)
 	case '.':
 		s.token(Dot)
 	case '-':
 		s.token(Minus)
+	case '?':
+		s.token(Question)
 	case '+':
 		s.token(Plus)
 	case ';':

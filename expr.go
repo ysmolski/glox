@@ -2,18 +2,6 @@ package main
 
 import "fmt"
 
-// expression     → literal
-//                | unary
-//                | binary
-//                | grouping ;
-//
-// literal        → NUMBER | STRING | "true" | "false" | "nil" ;
-// grouping       → "(" expression ")" ;
-// unary          → ( "-" | "!" ) expression ;
-// binary         → expression operator expression ;
-// operator       → "==" | "!=" | "<" | "<=" | ">" | ">="
-//                | "+"  | "-"  | "*" | "/" ;
-
 type (
 	Expr interface {
 		aExpr()
@@ -24,6 +12,12 @@ type (
 	BinaryExpr struct {
 		operator    *tokenObj
 		left, right Expr
+		expr
+	}
+
+	TernaryExpr struct {
+		operator      *tokenObj
+		op1, op2, op3 Expr
 		expr
 	}
 
@@ -51,6 +45,9 @@ func printAST(e Expr) string {
 	case *BinaryExpr:
 		return fmt.Sprintf("(%v %v %v)",
 			o.operator.tok, printAST(o.left), printAST(o.right))
+	case *TernaryExpr:
+		return fmt.Sprintf("(%v %v %v %v)",
+			o.operator.tok, printAST(o.op1), printAST(o.op2), printAST(o.op3))
 	case *UnaryExpr:
 		return fmt.Sprintf("(%v %v)",
 			o.operator.tok, printAST(o.right))

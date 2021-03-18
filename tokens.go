@@ -18,6 +18,8 @@ const (
 	Minus            // -
 	Plus             // +
 	Semicolon        // ;
+	Colon            // :
+	Question         // ?
 	Slash            // /
 	Star             // *
 
