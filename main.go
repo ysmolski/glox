@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -11,12 +10,12 @@ import (
 var hadError = false
 
 func main() {
-	args := flag.Args()
-	if len(args) > 1 {
+	args := os.Args
+	if len(args) > 2 {
 		fmt.Fprint(os.Stderr, "usage: glox [script]\n")
-		os.Exit(63)
-	} else if len(args) == 1 {
-		runFile(args[0])
+		os.Exit(1)
+	} else if len(args) == 2 {
+		runFile(args[1])
 	} else {
 		runPrompt()
 	}

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"strconv"
 )
 
@@ -131,7 +132,7 @@ func (s *Scanner) scanToken() {
 		} else if isAlpha(ch) {
 			s.identifier()
 		} else {
-			s.report("unexpected character")
+			s.report(fmt.Sprintf("unexpected character '%c'", ch))
 			return
 		}
 	}
