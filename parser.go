@@ -1,10 +1,27 @@
 package main
 
+import "fmt"
+
 // Recursive-descent parser
 //
-// expression     -> sequential ;
-// sequential     -> conditional ( "," conditional )* ;
-// conditional    -> equality ( "?" conditional ":" conditional )? ;
+// program        -> declaration* EOF ;
+//
+// declaration    -> varDecl
+//                 | statement ;
+//
+// varDecl        -> "var" IDENTIFIER ( "=" expression )? ";" ;
+//
+// statement      -> exprStmt
+//                 | printStmt
+//				   | block ;
+//
+// exprStmt       -> expression ";" ;
+// printStmt      -> "print" expression ";" ;
+// block		  -> "{" declaration* "}" ;
+//
+// expression     -> assignment ;
+// assignment     -> IDENTIFIER "=" assignment
+//				   | equality ;
 // equality       -> comparison ( ( "!=" | "==" ) comparison )* ;
 // comparison     -> term ( ( ">" | ">=" | "<" | "<=" ) term )* ;
 // term           -> factor ( ( "-" | "+" ) factor )* ;
@@ -12,17 +29,24 @@ package main
 // unary          -> ( "!" | "-" ) unary
 //                 | primary ;
 // primary        -> NUMBER | STRING | "true" | "false" | "nil"
-//                 | "(" expression ")" ;
+//                 | "(" expression ")"
+//                 | IDENTIFIER ;
 //
 
-type Parser struct {
+type parser struct {
 	tokens  []*tokenObj
 	current int
+	errs    []error
+}
+
+func NewParser(tokens []*tokenObj) *parser {
+	p := &parser{tokens, 0, make([]error, 0)}
+	return p
 }
 
 // match advances pointer to the next token if current token matches
 // any of toks and returns true
-func (p *Parser) match(toks ...token) bool {
+func (p *parser) match(toks ...token) bool {
 	for _, t := range toks {
 		if p.check(t) {
 			p.advance()
@@ -32,26 +56,26 @@ func (p *Parser) match(toks ...token) bool {
 	return false
 }
 
-func (p *Parser) advance() *tokenObj {
+func (p *parser) advance() *tokenObj {
 	if !p.atEnd() {
 		p.current++
 	}
 	return p.prev()
 }
 
-func (p *Parser) atEnd() bool {
+func (p *parser) atEnd() bool {
 	return p.peek().tok == EOF
 }
 
-func (p *Parser) peek() *tokenObj {
+func (p *parser) peek() *tokenObj {
 	return p.tokens[p.current]
 }
 
-func (p *Parser) prev() *tokenObj {
+func (p *parser) prev() *tokenObj {
 	return p.tokens[p.current-1]
 }
 
-func (p *Parser) check(tok token) bool {
+func (p *parser) check(tok token) bool {
 	if p.atEnd() {
 		return false
 	}
@@ -59,7 +83,7 @@ func (p *Parser) check(tok token) bool {
 	return p.peek().tok == tok
 }
 
-func (p *Parser) consume(expected token, msg string) *tokenObj {
+func (p *parser) consume(expected token, msg string) *tokenObj {
 	if p.check(expected) {
 		return p.advance()
 	}
@@ -73,13 +97,19 @@ func (e ParsingError) Error() string {
 	return string(e)
 }
 
-func (p *Parser) perror(t *tokenObj, msg string) {
-	e := errorAtToken(t, msg)
-	panic(ParsingError(e))
+func (p *parser) perror(t *tokenObj, msg string) {
+	e := ParsingError(errorAtToken(t, msg))
+	p.errs = append(p.errs, e)
+	panic(e)
 }
 
-func (p *Parser) sync() {
-	// fmt.Println("sync")
+func (p *parser) yerror(t *tokenObj, msg string) {
+	e := ParsingError(errorAtToken(t, msg))
+	p.errs = append(p.errs, e)
+}
+
+func (p *parser) sync() {
+	fmt.Println("sync")
 	p.advance()
 	for !p.atEnd() {
 		if p.prev().tok == Semicolon {
@@ -98,46 +128,97 @@ func (p *Parser) sync() {
 
 // parse returns an AST of parsed tokens, if it cannot parse then it returns
 // the error.
-func (p *Parser) parse() (e Expr, err error) {
+func (p *parser) parse() (s []Stmt, errs []error) {
+	// defer func() {
+	// 	if e := recover(); e != nil {
+	// 		_ = e.(ParsingError) // Will re-panic of not a parse error
+	// 	}
+	// }()
+	s = make([]Stmt, 0)
+	for !p.atEnd() {
+		s = append(s, p.declaration())
+	}
+
+	return s, p.errs
+}
+
+func (p *parser) declaration() (s Stmt) {
 	defer func() {
 		if e := recover(); e != nil {
-			err = e.(ParsingError) // Will re-panic of not a parse error
+			_ = e.(ParsingError) // Panic for other errors
+			p.sync()
+			s = nil
 		}
 	}()
-	return p.expression(), nil
+	if p.match(Var) {
+		return p.varDecl()
+	}
+	return p.statement()
+}
+
+func (p *parser) varDecl() Stmt {
+	name := p.consume(Identifier, "expected variable name")
+	var init Expr
+
+	if p.match(Equal) {
+		init = p.expression()
+	}
+	p.consume(Semicolon, "expected ';' after variable declaration")
+	return &VarStmt{name: name, init: init}
+}
+
+func (p *parser) statement() Stmt {
+	if p.match(Print) {
+		return p.printStatement()
+	}
+	if p.match(LeftBrace) {
+		return &BlockStmt{list: p.block()}
+	}
+	return p.exprStatement()
+}
+
+func (p *parser) printStatement() Stmt {
+	e := p.expression()
+	p.consume(Semicolon, "expected ';' after expression")
+	return &PrintStmt{expression: e}
+}
+
+func (p *parser) block() []Stmt {
+	list := make([]Stmt, 0)
+	for !p.check(RightBrace) && !p.atEnd() {
+		list = append(list, p.declaration())
+	}
+	p.consume(RightBrace, "expected '}' after block")
+	return list
+}
+
+func (p *parser) exprStatement() Stmt {
+	e := p.expression()
+	p.consume(Semicolon, "expected ';' after expression")
+	return &ExprStmt{expression: e}
 }
 
 // expression -> sequential ;
-func (p *Parser) expression() Expr {
-	return p.sequential()
+func (p *parser) expression() Expr {
+	return p.assignment()
 }
 
-// sequential -> equality ( "," equality )* ;
-func (p *Parser) sequential() Expr {
-	expr := p.conditional()
-	for p.match(Comma) {
-		op := p.prev()
-		right := p.conditional()
-		expr = &BinaryExpr{operator: op, left: expr, right: right}
-	}
-	return expr
-}
-
-// conditional -> equality ( "?" conditional ":" conditional )? ;
-func (p *Parser) conditional() Expr {
+func (p *parser) assignment() Expr {
 	expr := p.equality()
-	if p.match(Question) {
-		op := p.prev()
-		left := p.conditional()
-		p.consume(Colon, "expected ':' after <condition> ? <expression>")
-		right := p.conditional()
-		expr = &TernaryExpr{operator: op, op1: expr, op2: left, op3: right}
+	if p.match(Equal) {
+		equals := p.prev()
+		value := p.assignment()
+		if ev, ok := expr.(*VarExpr); ok {
+			name := ev.name
+			return &AssignExpr{name: name, value: value}
+		}
+		p.yerror(equals, "invalid assignment target")
 	}
 	return expr
 }
 
 // equality -> comparison ( ( "!=" | "==" ) comparison )* ;
-func (p *Parser) equality() Expr {
+func (p *parser) equality() Expr {
 	expr := p.comparison()
 	for p.match(BangEqual, EqualEqual) {
 		op := p.prev()
@@ -148,7 +229,7 @@ func (p *Parser) equality() Expr {
 }
 
 // comparison -> term ( ( ">" | ">=" | "<" | "<=" ) term )* ;
-func (p *Parser) comparison() Expr {
+func (p *parser) comparison() Expr {
 	expr := p.term()
 	for p.match(Greater, GreaterEqual, Less, LessEqual) {
 		op := p.prev()
@@ -159,7 +240,7 @@ func (p *Parser) comparison() Expr {
 }
 
 // term ->  factor ( ( "-" | "+" ) factor )* ;
-func (p *Parser) term() Expr {
+func (p *parser) term() Expr {
 	expr := p.factor()
 	for p.match(Plus, Minus) {
 		op := p.prev()
@@ -170,7 +251,7 @@ func (p *Parser) term() Expr {
 }
 
 // factor -> unary ( ( "/" | "*" ) unary )* ;
-func (p *Parser) factor() Expr {
+func (p *parser) factor() Expr {
 	expr := p.unary()
 	for p.match(Slash, Star) {
 		op := p.prev()
@@ -182,7 +263,7 @@ func (p *Parser) factor() Expr {
 
 // unary -> ( "!" | "-" ) unary
 //        | primary ;
-func (p *Parser) unary() Expr {
+func (p *parser) unary() Expr {
 	if p.match(Bang, Minus) {
 		op := p.prev()
 		right := p.unary()
@@ -193,7 +274,7 @@ func (p *Parser) unary() Expr {
 
 // primary -> NUMBER | STRING | "true" | "false" | "nil"
 //          | "(" expression ")" ;
-func (p *Parser) primary() Expr {
+func (p *parser) primary() Expr {
 	switch {
 	case p.match(False):
 		return &LiteralExpr{value: false}
@@ -203,6 +284,8 @@ func (p *Parser) primary() Expr {
 		return &LiteralExpr{value: nil}
 	case p.match(Number, String):
 		return &LiteralExpr{value: p.prev().literal}
+	case p.match(Identifier):
+		return &VarExpr{name: p.prev()}
 	case p.match(LeftParen):
 		expr := p.expression()
 		p.consume(RightParen, "expected enclosing ')' after expression")

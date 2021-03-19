@@ -57,25 +57,20 @@ func run(source string) {
 	// 	fmt.Println("token ", t)
 	// }
 
-	p := &Parser{tokens, 0}
-	expr, err := p.parse()
-	if err != nil {
-		fmt.Println(err)
+	p := NewParser(tokens)
+	stmt, errs := p.parse()
+	if len(errs) > 0 {
+		for _, e := range errs {
+			fmt.Println(e)
+		}
 		hadError = true
 		return
 	}
 	// fmt.Printf("ast = %+v\n", printAST(expr))
-
-	// catch runtime error, print and bail
-	defer func() {
-		e := recover()
-		if e != nil {
-			fmt.Println(e)
-			hadError = true
-		}
-	}()
-	val := expr.eval()
-	fmt.Println(val)
+	if err := interpret(stmt); err != nil {
+		fmt.Println(err)
+		hadError = true
+	}
 }
 
 func errorAtToken(t *tokenObj, msg string) string {
@@ -90,15 +85,4 @@ func errorAtToken(t *tokenObj, msg string) string {
 
 func errorAt(line int, where, msg string) string {
 	return fmt.Sprintf("[line %v] error%v: %v", line, where, msg)
-}
-
-type RuntimeError string
-
-func (e RuntimeError) Error() string {
-	return string(e)
-}
-
-func runtimeErr(t *tokenObj, msg string) error {
-	return RuntimeError(fmt.Sprintf("[line %v] runtime error: %v",
-		t.line, msg))
 }
