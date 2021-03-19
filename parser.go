@@ -1,10 +1,5 @@
 package main
 
-import (
-	"errors"
-	"fmt"
-)
-
 // Recursive-descent parser
 //
 // expression     -> sequential ;
@@ -68,12 +63,19 @@ func (p *Parser) consume(expected token, msg string) *tokenObj {
 	if p.check(expected) {
 		return p.advance()
 	}
-	panic(p.err(p.peek(), msg))
+	p.perror(p.peek(), msg)
+	return nil
 }
 
-func (p *Parser) err(t *tokenObj, msg string) error {
-	reportToken(t, msg)
-	return errors.New("parsing failed")
+type ParsingError string
+
+func (e ParsingError) Error() string {
+	return string(e)
+}
+
+func (p *Parser) perror(t *tokenObj, msg string) {
+	e := errorAtToken(t, msg)
+	panic(ParsingError(e))
 }
 
 func (p *Parser) sync() {
@@ -94,14 +96,15 @@ func (p *Parser) sync() {
 // ---------------------------------------------------------
 //
 
-func (p *Parser) parse() Expr {
+// parse returns an AST of parsed tokens, if it cannot parse then it returns
+// the error.
+func (p *Parser) parse() (e Expr, err error) {
 	defer func() {
-		e := recover()
-		if e != nil {
-			fmt.Println(e)
+		if e := recover(); e != nil {
+			err = e.(ParsingError) // Will re-panic of not a parse error
 		}
 	}()
-	return p.expression()
+	return p.expression(), nil
 }
 
 // expression -> sequential ;
@@ -205,5 +208,6 @@ func (p *Parser) primary() Expr {
 		p.consume(RightParen, "expected enclosing ')' after expression")
 		return &GroupingExpr{e: expr}
 	}
-	panic(p.err(p.peek(), "expected expression"))
+	p.perror(p.peek(), "expected expression")
+	return nil
 }

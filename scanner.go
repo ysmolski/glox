@@ -1,6 +1,8 @@
 package main
 
-import "strconv"
+import (
+	"strconv"
+)
 
 var keywords = map[string]token{
 	"and":    And,
@@ -21,12 +23,19 @@ var keywords = map[string]token{
 	"while":  While,
 }
 
+type ScanError string
+
+func (e ScanError) Error() string {
+	return string(e)
+}
+
 type Scanner struct {
 	source  string
 	tokens  []*tokenObj
 	start   int // start of the lexeme
 	current int // pointer of scanner
 	line    int
+	err     error
 }
 
 func NewScanner(source string) *Scanner {
@@ -37,14 +46,16 @@ func NewScanner(source string) *Scanner {
 	}
 }
 
-func (s *Scanner) scan() []*tokenObj {
-	for !s.atEnd() {
+func (s *Scanner) scan() ([]*tokenObj, error) {
+	for !s.atEnd() && s.err == nil {
 		s.start = s.current
 		s.scanToken()
 	}
 
-	s.tokens = append(s.tokens, &tokenObj{tok: EOF})
-	return s.tokens
+	if s.err == nil {
+		s.tokens = append(s.tokens, &tokenObj{tok: EOF, line: s.line})
+	}
+	return s.tokens, s.err
 }
 
 func (s *Scanner) scanToken() {
@@ -120,9 +131,14 @@ func (s *Scanner) scanToken() {
 		} else if isAlpha(ch) {
 			s.identifier()
 		} else {
-			report(s.line, "unexpected character")
+			s.report("unexpected character")
+			return
 		}
 	}
+}
+
+func (s *Scanner) report(msg string) {
+	s.err = ScanError(errorAt(s.line, "", msg))
 }
 
 func isDigit(b byte) bool {
@@ -193,7 +209,7 @@ func (s *Scanner) stringLit() {
 		s.advance()
 	}
 	if s.atEnd() {
-		report(s.line, "unterminated string")
+		s.report("unterminated string")
 		return
 	}
 	s.advance() // skip closing "
@@ -213,7 +229,8 @@ func (s *Scanner) number() {
 	}
 	val, err := strconv.ParseFloat(s.source[s.start:s.current], 64)
 	if err != nil {
-		report(s.line, "cannot parse float number")
+		s.report("cannot parse float number")
+		return
 	}
 	s.literal(Number, val)
 }
@@ -240,7 +257,7 @@ func (s *Scanner) fullComment() {
 		s.advance()
 	}
 	if s.atEnd() {
-		report(s.line, "unterminated /**/ comment")
+		s.report("unterminated /**/ comment")
 		return
 	}
 	s.advance() // skip *

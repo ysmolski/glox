@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -49,14 +48,21 @@ func runPrompt() {
 
 func run(source string) {
 	scanner := NewScanner(source)
-	tokens := scanner.scan()
+	tokens, err := scanner.scan()
+	if err != nil {
+		fmt.Println(err)
+		hadError = true
+		return
+	}
 	// for _, t := range tokens {
 	// 	fmt.Println("token ", t)
 	// }
-	p := &Parser{tokens, 0}
-	expr := p.parse()
 
-	if hadError {
+	p := &Parser{tokens, 0}
+	expr, err := p.parse()
+	if err != nil {
+		fmt.Println(err)
+		hadError = true
 		return
 	}
 	// fmt.Printf("ast = %+v\n", printAST(expr))
@@ -73,23 +79,27 @@ func run(source string) {
 	fmt.Println(val)
 }
 
-func report(line int, msg string) {
-	reportLoc(line, "", msg)
+func errorAtToken(t *tokenObj, msg string) string {
+	var e string
+	if t.tok == EOF {
+		e = errorAt(t.line, " at end", msg)
+	} else {
+		e = errorAt(t.line, " at '"+t.lexeme+"'", msg)
+	}
+	return e
 }
 
-func reportToken(t *tokenObj, msg string) {
-	if t.tok == EOF {
-		reportLoc(t.line, " at end", msg)
-	} else {
-		reportLoc(t.line, " at '"+t.lexeme+"'", msg)
-	}
+func errorAt(line int, where, msg string) string {
+	return fmt.Sprintf("[line %v] error%v: %v", line, where, msg)
 }
-func reportLoc(line int, where, msg string) {
-	fmt.Printf("[line %v] error%v: %v\n", line, where, msg)
-	hadError = true
+
+type RuntimeError string
+
+func (e RuntimeError) Error() string {
+	return string(e)
 }
 
 func runtimeErr(t *tokenObj, msg string) error {
-	return errors.New(fmt.Sprintf("[line %v] runtime error: %v",
+	return RuntimeError(fmt.Sprintf("[line %v] runtime error: %v",
 		t.line, msg))
 }
