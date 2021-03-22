@@ -18,20 +18,32 @@ func runtimeErr(t *tokenObj, msg string) error {
 
 // env contains bindings for variables.
 type Env struct {
-	values    map[string]value
+	values map[string]value
+
+	// init means that variable was properly initialized
+	init map[string]bool
+
 	enclosing *Env
 }
 
 func NewEnv(enclosing *Env) *Env {
-	return &Env{make(map[string]value), enclosing}
+	return &Env{make(map[string]value), make(map[string]bool), enclosing}
 }
 
-func (e *Env) define(name string, v value) {
+func (e *Env) defineInit(name string, v value) {
 	e.values[name] = v
+	e.init[name] = true
+}
+
+func (e *Env) define(name string) {
+	e.values[name] = nil
 }
 
 func (e *Env) get(name *tokenObj) value {
 	if v, ok := e.values[name.lexeme]; ok {
+		if _, ok := e.init[name.lexeme]; !ok {
+			runtimeErr(name, "variable '"+name.lexeme+"' should be initialized first")
+		}
 		return v
 	}
 	if e.enclosing != nil {
@@ -45,6 +57,7 @@ func (e *Env) get(name *tokenObj) value {
 func (e *Env) assign(name *tokenObj, v value) {
 	if _, ok := e.values[name.lexeme]; ok {
 		e.values[name.lexeme] = v
+		e.init[name.lexeme] = true
 		return
 	}
 	if e.enclosing != nil {
@@ -206,11 +219,13 @@ func (s *PrintStmt) execute(env *Env) {
 }
 
 func (s *VarStmt) execute(env *Env) {
-	var v value
+	// make distinction between uninitialized value and nil-value
 	if s.init != nil {
-		v = s.init.eval(env)
+		v := s.init.eval(env)
+		env.defineInit(s.name.lexeme, v)
+	} else {
+		env.define(s.name.lexeme)
 	}
-	env.define(s.name.lexeme, v)
 }
 
 func (s *BlockStmt) execute(env *Env) {
