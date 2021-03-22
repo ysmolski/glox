@@ -66,8 +66,9 @@ func run(source string) {
 		hadError = true
 		return
 	}
-	// fmt.Printf("ast = %+v\n", printAST(expr))
-	if err := interpret(stmt); err != nil {
+
+	env := NewEnv(nil) // root env has no enclosure
+	if err := interpret(stmt, env); err != nil {
 		fmt.Println(err)
 		hadError = true
 	}

@@ -129,11 +129,6 @@ func (p *parser) sync() {
 // parse returns an AST of parsed tokens, if it cannot parse then it returns
 // the error.
 func (p *parser) parse() (s []Stmt, errs []error) {
-	// defer func() {
-	// 	if e := recover(); e != nil {
-	// 		_ = e.(ParsingError) // Will re-panic of not a parse error
-	// 	}
-	// }()
 	s = make([]Stmt, 0)
 	for !p.atEnd() {
 		s = append(s, p.declaration())
