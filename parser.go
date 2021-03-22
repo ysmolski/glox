@@ -12,16 +12,26 @@ import "fmt"
 // varDecl        -> "var" IDENTIFIER ( "=" expression )? ";" ;
 //
 // statement      -> exprStmt
+//                 | forStmt
+//                 | ifStmt
 //                 | printStmt
+//                 | whileStmt
 //				   | block ;
 //
 // exprStmt       -> expression ";" ;
 // printStmt      -> "print" expression ";" ;
+// forStmt        -> "for" "(" ( varDecl | exprStmt | ";" )
+//                   expression? ";"
+//                   expression? ")" statement ;
+// ifStmt         -> "if" "(" expression ")" statement ( "else" statement )? ;
+// whileStmt      -> "while" "(" expression ")" statement ;
 // block		  -> "{" declaration* "}" ;
 //
 // expression     -> assignment ;
 // assignment     -> IDENTIFIER "=" assignment
-//				   | equality ;
+//				   | logicOr ;
+// logicOr        -> logicAnd ( "or" logicAnd )* ;
+// logicAnd       -> equality ( "and" equality )* ;
 // equality       -> comparison ( ( "!=" | "==" ) comparison )* ;
 // comparison     -> term ( ( ">" | ">=" | "<" | "<=" ) term )* ;
 // term           -> factor ( ( "-" | "+" ) factor )* ;
@@ -163,8 +173,17 @@ func (p *parser) varDecl() Stmt {
 }
 
 func (p *parser) statement() Stmt {
+	if p.match(For) {
+		return p.forStatement()
+	}
+	if p.match(If) {
+		return p.ifStatement()
+	}
 	if p.match(Print) {
 		return p.printStatement()
+	}
+	if p.match(While) {
+		return p.whileStatement()
 	}
 	if p.match(LeftBrace) {
 		return &BlockStmt{list: p.block()}
@@ -172,10 +191,73 @@ func (p *parser) statement() Stmt {
 	return p.exprStatement()
 }
 
+func (p *parser) forStatement() Stmt {
+	p.consume(LeftParen, "expected '(' after 'for'")
+
+	var initial Stmt
+	switch {
+	case p.match(Semicolon):
+		initial = nil
+	case p.match(Var):
+		initial = p.varDecl()
+	default:
+		initial = p.exprStatement()
+	}
+
+	var cond Expr
+	if !p.check(Semicolon) {
+		cond = p.expression()
+	}
+	p.consume(Semicolon, "expected ';' after for condition")
+
+	var incr Expr
+	if !p.check(RightParen) {
+		incr = p.expression()
+	}
+	p.consume(RightParen, "expected ')' after for clauses")
+
+	body := p.statement()
+
+	if incr != nil {
+		body = &BlockStmt{list: []Stmt{
+			body,
+			&ExprStmt{expression: incr}}}
+	}
+	if cond != nil {
+		body = &WhileStmt{condition: cond, body: body}
+	}
+	if initial != nil {
+		body = &BlockStmt{list: []Stmt{
+			initial,
+			body}}
+	}
+	return body
+}
+
+func (p *parser) ifStatement() Stmt {
+	p.consume(LeftParen, "expected '(' after 'if'")
+	e := p.expression()
+	p.consume(RightParen, "expected ')' after if condition")
+	a := p.statement()
+	var b Stmt = nil
+	if p.match(Else) {
+		b = p.statement()
+	}
+	return &IfStmt{condition: e, a: a, b: b}
+}
+
 func (p *parser) printStatement() Stmt {
 	e := p.expression()
 	p.consume(Semicolon, "expected ';' after expression")
 	return &PrintStmt{expression: e}
+}
+
+func (p *parser) whileStatement() Stmt {
+	p.consume(LeftParen, "expected '(' after while")
+	expr := p.expression()
+	p.consume(RightParen, "expected ')' after while condition")
+	body := p.statement()
+	return &WhileStmt{condition: expr, body: body}
 }
 
 func (p *parser) block() []Stmt {
@@ -193,13 +275,12 @@ func (p *parser) exprStatement() Stmt {
 	return &ExprStmt{expression: e}
 }
 
-// expression -> sequential ;
 func (p *parser) expression() Expr {
 	return p.assignment()
 }
 
 func (p *parser) assignment() Expr {
-	expr := p.equality()
+	expr := p.or()
 	if p.match(Equal) {
 		equals := p.prev()
 		value := p.assignment()
@@ -208,6 +289,26 @@ func (p *parser) assignment() Expr {
 			return &AssignExpr{name: name, value: value}
 		}
 		p.yerror(equals, "invalid assignment target")
+	}
+	return expr
+}
+
+func (p *parser) or() Expr {
+	expr := p.and()
+	for p.match(Or) {
+		op := p.prev()
+		right := p.and()
+		expr = &LogicalExpr{operator: op, left: expr, right: right}
+	}
+	return expr
+}
+
+func (p *parser) and() Expr {
+	expr := p.equality()
+	for p.match(And) {
+		op := p.prev()
+		right := p.equality()
+		expr = &LogicalExpr{operator: op, left: expr, right: right}
 	}
 	return expr
 }

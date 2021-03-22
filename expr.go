@@ -26,9 +26,9 @@ type (
 		expr
 	}
 
-	TernaryExpr struct {
-		operator      *tokenObj
-		op1, op2, op3 Expr
+	LogicalExpr struct {
+		operator    *tokenObj
+		left, right Expr
 		expr
 	}
 
@@ -50,7 +50,7 @@ type (
 	}
 )
 
-func (*expr) aExpr()            {}
+func (*expr) aExpr()          {}
 func (*expr) eval(*Env) value { return nil }
 
 type (
@@ -81,9 +81,21 @@ type (
 		list []Stmt
 		stmt
 	}
+
+	IfStmt struct {
+		condition Expr
+		a, b      Stmt
+		stmt
+	}
+
+	WhileStmt struct {
+		condition Expr
+		body      Stmt
+		stmt
+	}
 )
 
-func (*stmt) aStmt()         {}
+func (*stmt) aStmt()       {}
 func (*stmt) execute(*Env) {}
 
 // func printAST(e Expr) string {

@@ -1,0 +1,14 @@
+if (1+2 == 3 or false) {
+	print "br 1";
+} else {
+	print "br 2";
+}
+
+if (1 == 2 or 2 == 3 or 3 == 4) 
+	print "should not be printed";
+
+print "hi" or 2;
+print false or "yes";
+print nil or "yes";
+print "one" and "two";
+print "this" and false;

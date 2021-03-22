@@ -1,0 +1,9 @@
+var i = 0;
+var a = 100;
+while (i < 10) {
+	var a = 200;
+	print i;
+	print a;
+	i = i + 1;
+}
+print a;

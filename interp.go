@@ -168,6 +168,20 @@ func (e *LiteralExpr) eval(env *Env) value {
 	return e.value
 }
 
+func (e *LogicalExpr) eval(env *Env) value {
+	left := e.left.eval(env)
+	if e.operator.tok == Or {
+		if isTruthy(left) {
+			return left
+		}
+	} else {
+		if !isTruthy(left) {
+			return left
+		}
+	}
+	return e.right.eval(env)
+}
+
 func (e *UnaryExpr) eval(env *Env) value {
 	val := e.right.eval(env)
 	switch e.operator.tok {
@@ -235,5 +249,19 @@ func (s *BlockStmt) execute(env *Env) {
 func execBlock(list []Stmt, env *Env) {
 	for _, s := range list {
 		s.execute(env)
+	}
+}
+
+func (s *IfStmt) execute(env *Env) {
+	if isTruthy(s.condition.eval(env)) {
+		s.a.execute(env)
+	} else if s.b != nil {
+		s.b.execute(env)
+	}
+}
+
+func (s *WhileStmt) execute(env *Env) {
+	for isTruthy(s.condition.eval(env)) {
+		s.body.execute(env)
 	}
 }
