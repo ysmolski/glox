@@ -29,6 +29,12 @@ type (
 		expr
 	}
 
+	FunExpr struct {
+		params []*tokenObj
+		body   []Stmt
+		expr
+	}
+
 	GroupingExpr struct {
 		e Expr
 		expr

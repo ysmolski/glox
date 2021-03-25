@@ -7,13 +7,15 @@ import "fmt"
 // program        -> declaration* EOF ;
 //
 // declaration    -> funDecl
+//                 | lambdaCall
 //                 | varDecl
 //                 | statement ;
 //
 // funDecl        -> "fun" function ;
 // function       -> IDENTIFIER "(" parameters? ")" block ;
-//
 // parameters     -> IDENTIFIER ( "," IDENTIFIER )* ;
+//
+// lambdaCall     -> funExpr "(" arguments? ")" ";" ;
 //
 // varDecl        -> "var" IDENTIFIER ( "=" expression )? ";" ;
 //
@@ -27,19 +29,21 @@ import "fmt"
 //                 | whileStmt
 //				   | block ;
 //
+// block		  -> "{" declaration* "}" ;
 // breakStmt      -> "break" ";" ;
 // continueStmt   -> "continue" ";" ;
 // exprStmt       -> expression ";" ;
-// printStmt      -> "print" expression ";" ;
 // forStmt        -> "for" "(" ( varDecl | exprStmt | ";" )
 //                   expression? ";"
 //                   expression? ")" statement ;
 // ifStmt         -> "if" "(" expression ")" statement ( "else" statement )? ;
+// printStmt      -> "print" expression ";" ;
 // returnStmt     -> "return" expression? ";" ;
 // whileStmt      -> "while" "(" expression ")" statement ;
-// block		  -> "{" declaration* "}" ;
 //
-// expression     -> assignment ;
+// expression     -> funExpr
+//                 | assignment ;
+// funExpr        -> "fun" "(" parameters? ")" block ;
 // assignment     -> IDENTIFIER "=" assignment
 //				   | logicOr ;
 // logicOr        -> logicAnd ( "or" logicAnd )* ;
@@ -170,6 +174,9 @@ func (p *parser) declaration() (s Stmt) {
 		}
 	}()
 	if p.match(Fun) {
+		if p.check(LeftParen) {
+			return p.lambdaCall()
+		}
 		return p.funDecl("function")
 	}
 	if p.match(Var) {
@@ -355,7 +362,43 @@ func (p *parser) exprStatement() Stmt {
 }
 
 func (p *parser) expression() Expr {
+	if p.match(Fun) {
+		return p.funExpr()
+	}
 	return p.assignment()
+}
+
+func (p *parser) funExpr() Expr {
+	p.consume(LeftParen, "expected '(' after 'fun'")
+	params := make([]*tokenObj, 0)
+	if !p.check(RightParen) {
+		for {
+			if len(params) >= 255 {
+				p.yerror(p.peek(), "can't have more than 255 parameters")
+			}
+			params = append(params, p.consume(Identifier, "expected parameter name"))
+			if !p.match(Comma) {
+				break
+			}
+		}
+	}
+	p.consume(RightParen, "expected ')' after parameters")
+	p.consume(LeftBrace, "expected '{' after anonymous function signature")
+	body := p.block()
+	return &FunExpr{params: params, body: body}
+}
+
+func (p *parser) lambdaCall() Stmt {
+	expr := p.funExpr()
+	for {
+		if p.match(LeftParen) {
+			expr = p.finishCall(expr)
+		} else {
+			break
+		}
+	}
+	p.consume(Semicolon, "expected ';' call to a function")
+	return &ExprStmt{expression: expr}
 }
 
 func (p *parser) assignment() Expr {

@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -157,6 +158,40 @@ func (f *FunObj) String() string {
 	return fmt.Sprintf("<fn %v>", f.decl.name.lexeme)
 }
 
+type FunAnon struct {
+	decl    *FunExpr
+	closure *Env
+}
+
+func (f *FunAnon) arity() int {
+	return len(f.decl.params)
+}
+
+func (f *FunAnon) call(e *Env, args []value) (v value) {
+	// Should it use env that is passed by e?
+	env := NewEnv(f.closure)
+	for i, p := range f.decl.params {
+		env.defineInit(p.lexeme, args[i])
+	}
+
+	defer func() {
+		if e := recover(); e != nil {
+			// return whatever value is being panicked at us from return stmt
+			v = e.(ReturnHack)
+		}
+	}()
+	execBlock(f.decl.body, env)
+	return nil
+}
+
+func (f *FunAnon) String() string {
+	s := []string{}
+	for _, p := range f.decl.params {
+		s = append(s, p.lexeme)
+	}
+	return fmt.Sprintf("<lambda (%v)>", strings.Join(s, ","))
+}
+
 // ------------------------------------------
 // Expression Eval
 
@@ -255,6 +290,11 @@ func (e *CallExpr) eval(env *Env) value {
 	}
 }
 
+func (s *FunExpr) eval(env *Env) value {
+	fn := &FunAnon{decl: s, closure: NewEnv(env)}
+	return fn
+}
+
 func (e *GroupingExpr) eval(env *Env) value {
 	return e.e.eval(env)
 }
@@ -329,7 +369,7 @@ func (s *FunStmt) execute(env *Env) {
 
 func (s *PrintStmt) execute(env *Env) {
 	v := s.expression.eval(env)
-	fmt.Println(v)
+	fmt.Printf("%v\n", v)
 }
 
 func (s *VarStmt) execute(env *Env) {
