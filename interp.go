@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"time"
 )
@@ -17,6 +18,8 @@ func runtimeErr(t *tokenObj, msg string) error {
 }
 
 type ReturnHack value
+type BreakErr struct{ t *tokenObj }
+type ContinueErr struct{ t *tokenObj }
 
 type Callable interface {
 	arity() int
@@ -94,6 +97,12 @@ func interpret(stmt []Stmt, env *Env) (err error) {
 	env.defineInit("clock", clockFn{})
 	defer func() {
 		if e := recover(); e != nil {
+			if b, ok := e.(BreakErr); ok {
+				fmt.Printf("b.t = %+v\n", b.t.line)
+				s := fmt.Sprintf("expected a while loop to break from at line %v ", b.t.line)
+				err = errors.New(s)
+				return
+			}
 			err = e.(RuntimeError)
 		}
 	}()
@@ -345,9 +354,9 @@ func execBlock(list []Stmt, env *Env) {
 
 func (s *IfStmt) execute(env *Env) {
 	if isTruthy(s.condition.eval(env)) {
-		s.a.execute(env)
-	} else if s.b != nil {
-		s.b.execute(env)
+		s.block1.execute(env)
+	} else if s.block2 != nil {
+		s.block2.execute(env)
 	}
 }
 
@@ -360,8 +369,38 @@ func (s *ReturnStmt) execute(env *Env) {
 	panic(ReturnHack(v))
 }
 
+func (s *BreakStmt) execute(env *Env) {
+	panic(BreakErr{t: s.keyword})
+}
+
+func (s *ContinueStmt) execute(env *Env) {
+	panic(ContinueErr{t: s.keyword})
+}
+
 func (s *WhileStmt) execute(env *Env) {
+	for !s.isDone(env) {
+	}
+}
+
+// isDone returns false when the loop was continued,
+// when loop is done returns true
+func (s *WhileStmt) isDone(env *Env) (done bool) {
+	defer func() {
+		if e := recover(); e != nil {
+			switch e.(type) {
+			case ContinueErr:
+				done = false
+				return
+			case BreakErr:
+				done = true
+				return
+			default:
+				panic(e)
+			}
+		}
+	}()
 	for isTruthy(s.condition.eval(env)) {
 		s.body.execute(env)
 	}
+	return true
 }

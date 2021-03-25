@@ -18,6 +18,8 @@ import "fmt"
 // varDecl        -> "var" IDENTIFIER ( "=" expression )? ";" ;
 //
 // statement      -> exprStmt
+//                 | breakStmt
+//                 | continueStmt
 //                 | forStmt
 //                 | ifStmt
 //                 | printStmt
@@ -25,6 +27,8 @@ import "fmt"
 //                 | whileStmt
 //				   | block ;
 //
+// breakStmt      -> "break" ";" ;
+// continueStmt   -> "continue" ";" ;
 // exprStmt       -> expression ";" ;
 // printStmt      -> "print" expression ";" ;
 // forStmt        -> "for" "(" ( varDecl | exprStmt | ";" )
@@ -56,10 +60,11 @@ type parser struct {
 	tokens  []*tokenObj
 	current int
 	errs    []error
+	inLoop  int
 }
 
 func NewParser(tokens []*tokenObj) *parser {
-	p := &parser{tokens, 0, make([]error, 0)}
+	p := &parser{tokens, 0, make([]error, 0), 0}
 	return p
 }
 
@@ -206,6 +211,12 @@ func (p *parser) varDecl() Stmt {
 }
 
 func (p *parser) statement() Stmt {
+	if p.match(Break) {
+		return p.breakStatement()
+	}
+	if p.match(Continue) {
+		return p.continueStatement()
+	}
 	if p.match(For) {
 		return p.forStatement()
 	}
@@ -225,6 +236,24 @@ func (p *parser) statement() Stmt {
 		return &BlockStmt{list: p.block()}
 	}
 	return p.exprStatement()
+}
+
+func (p *parser) breakStatement() Stmt {
+	key := p.prev()
+	if p.inLoop < 1 {
+		p.perror(key, "expected inside the loop")
+	}
+	p.consume(Semicolon, "expected ';' after break")
+	return &BreakStmt{keyword: key}
+}
+
+func (p *parser) continueStatement() Stmt {
+	key := p.prev()
+	if p.inLoop < 1 {
+		p.perror(key, "expected inside the loop")
+	}
+	p.consume(Semicolon, "expected ';' after continue")
+	return &ContinueStmt{keyword: key}
 }
 
 func (p *parser) forStatement() Stmt {
@@ -252,7 +281,9 @@ func (p *parser) forStatement() Stmt {
 	}
 	p.consume(RightParen, "expected ')' after for clauses")
 
+	p.inLoop += 1
 	body := p.statement()
+	p.inLoop -= 1
 
 	if incr != nil {
 		body = &BlockStmt{list: []Stmt{
@@ -279,7 +310,7 @@ func (p *parser) ifStatement() Stmt {
 	if p.match(Else) {
 		b = p.statement()
 	}
-	return &IfStmt{condition: e, a: a, b: b}
+	return &IfStmt{condition: e, block1: a, block2: b}
 }
 
 func (p *parser) printStatement() Stmt {
@@ -302,7 +333,9 @@ func (p *parser) whileStatement() Stmt {
 	p.consume(LeftParen, "expected '(' after while")
 	expr := p.expression()
 	p.consume(RightParen, "expected ')' after while condition")
+	p.inLoop += 1
 	body := p.statement()
+	p.inLoop -= 1
 	return &WhileStmt{condition: expr, body: body}
 }
 

@@ -33,27 +33,29 @@ func _() {
 	_ = x[String-23]
 	_ = x[Number-24]
 	_ = x[And-25]
-	_ = x[Class-26]
-	_ = x[Else-27]
-	_ = x[False-28]
-	_ = x[Fun-29]
-	_ = x[For-30]
-	_ = x[If-31]
-	_ = x[Nil-32]
-	_ = x[Or-33]
-	_ = x[Print-34]
-	_ = x[Return-35]
-	_ = x[Super-36]
-	_ = x[This-37]
-	_ = x[True-38]
-	_ = x[Var-39]
-	_ = x[While-40]
-	_ = x[EOF-41]
+	_ = x[Break-26]
+	_ = x[Class-27]
+	_ = x[Continue-28]
+	_ = x[Else-29]
+	_ = x[False-30]
+	_ = x[Fun-31]
+	_ = x[For-32]
+	_ = x[If-33]
+	_ = x[Nil-34]
+	_ = x[Or-35]
+	_ = x[Print-36]
+	_ = x[Return-37]
+	_ = x[Super-38]
+	_ = x[This-39]
+	_ = x[True-40]
+	_ = x[Var-41]
+	_ = x[While-42]
+	_ = x[EOF-43]
 }
 
-const _token_name = "(){},.-+;:?/*!!====>>=<<=identstringnumberandclasselsefalsefunforifnilorprintreturnsuperthistruevarwhileeof"
+const _token_name = "(){},.-+;:?/*!!====>>=<<=identstringnumberandbreakclasscontinueelsefalsefunforifnilorprintreturnsuperthistruevarwhileeof"
 
-var _token_index = [...]uint8{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16, 17, 19, 20, 22, 23, 25, 30, 36, 42, 45, 50, 54, 59, 62, 65, 67, 70, 72, 77, 83, 88, 92, 96, 99, 104, 107}
+var _token_index = [...]uint8{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16, 17, 19, 20, 22, 23, 25, 30, 36, 42, 45, 50, 55, 63, 67, 72, 75, 78, 80, 83, 85, 90, 96, 101, 105, 109, 112, 117, 120}
 
 func (i token) String() string {
 	i -= 1

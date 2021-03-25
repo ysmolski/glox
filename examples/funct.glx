@@ -21,7 +21,7 @@ fun count(n) {
   }
 }
 
-count(1); // should produce 1, 2
+print count(1); // should produce 1, 2, 3
 
 print "";
 print "closure";

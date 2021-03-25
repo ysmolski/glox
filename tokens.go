@@ -36,22 +36,24 @@ const (
 	String     // string
 	Number     // number
 
-	And    // and
-	Class  // class
-	Else   // else
-	False  // false
-	Fun    // fun
-	For    // for
-	If     // if
-	Nil    // nil
-	Or     // or
-	Print  // print
-	Return // return
-	Super  // super
-	This   // this
-	True   // true
-	Var    // var
-	While  // while
+	And      // and
+	Break    // break
+	Class    // class
+	Continue // continue
+	Else     // else
+	False    // false
+	Fun      // fun
+	For      // for
+	If       // if
+	Nil      // nil
+	Or       // or
+	Print    // print
+	Return   // return
+	Super    // super
+	This     // this
+	True     // true
+	Var      // var
+	While    // while
 
 	EOF // eof
 )

@@ -73,6 +73,16 @@ type (
 		stmt
 	}
 
+	BreakStmt struct {
+		keyword *tokenObj
+		stmt
+	}
+
+	ContinueStmt struct {
+		keyword *tokenObj
+		stmt
+	}
+
 	ExprStmt struct {
 		expression Expr
 		stmt
@@ -86,8 +96,8 @@ type (
 	}
 
 	IfStmt struct {
-		condition Expr
-		a, b      Stmt
+		condition      Expr
+		block1, block2 Stmt
 		stmt
 	}
 
@@ -98,7 +108,7 @@ type (
 
 	ReturnStmt struct {
 		keyword *tokenObj
-		value Expr
+		value   Expr
 		stmt
 	}
 
