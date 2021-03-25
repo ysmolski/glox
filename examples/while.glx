@@ -1,3 +1,4 @@
+var t = clock();
 var i = 0;
 var a = 100;
 while (i < 10) {
@@ -7,3 +8,4 @@ while (i < 10) {
 	i = i + 1;
 }
 print a;
+print clock() - t;

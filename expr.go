@@ -10,9 +10,22 @@ type (
 
 	expr struct{}
 
+	AssignExpr struct {
+		name  *tokenObj
+		value Expr
+		expr
+	}
+
 	BinaryExpr struct {
 		operator    *tokenObj
 		left, right Expr
+		expr
+	}
+
+	CallExpr struct {
+		callee Expr
+		paren  *tokenObj
+		args   []Expr
 		expr
 	}
 
@@ -42,12 +55,6 @@ type (
 		name *tokenObj
 		expr
 	}
-
-	AssignExpr struct {
-		name  *tokenObj
-		value Expr
-		expr
-	}
 )
 
 func (*expr) aExpr()          {}
@@ -61,8 +68,26 @@ type (
 
 	stmt struct{}
 
+	BlockStmt struct {
+		list []Stmt
+		stmt
+	}
+
 	ExprStmt struct {
 		expression Expr
+		stmt
+	}
+
+	FunStmt struct {
+		name   *tokenObj
+		params []*tokenObj
+		body   []Stmt
+		stmt
+	}
+
+	IfStmt struct {
+		condition Expr
+		a, b      Stmt
 		stmt
 	}
 
@@ -71,20 +96,15 @@ type (
 		stmt
 	}
 
+	ReturnStmt struct {
+		keyword *tokenObj
+		value Expr
+		stmt
+	}
+
 	VarStmt struct {
 		name *tokenObj
 		init Expr
-		stmt
-	}
-
-	BlockStmt struct {
-		list []Stmt
-		stmt
-	}
-
-	IfStmt struct {
-		condition Expr
-		a, b      Stmt
 		stmt
 	}
 

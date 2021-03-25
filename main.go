@@ -67,8 +67,8 @@ func run(source string) {
 		return
 	}
 
-	env := NewEnv(nil) // root env has no enclosure
-	if err := interpret(stmt, env); err != nil {
+	globals := NewEnv(nil) // root env has no enclosure
+	if err := interpret(stmt, globals); err != nil {
 		fmt.Println(err)
 		hadError = true
 	}

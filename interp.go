@@ -1,6 +1,9 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 type RuntimeError string
 
@@ -11,6 +14,13 @@ func (e RuntimeError) Error() string {
 func runtimeErr(t *tokenObj, msg string) error {
 	panic(RuntimeError(
 		fmt.Sprintf("[line %v] runtime error: %v", t.line, msg)))
+}
+
+type ReturnHack value
+
+type Callable interface {
+	arity() int
+	call(*Env, []value) value
 }
 
 // ------------------------------------------
@@ -24,10 +34,18 @@ type Env struct {
 	init map[string]bool
 
 	enclosing *Env
+	globals   *Env // always points to the root of enclosures
 }
 
 func NewEnv(enclosing *Env) *Env {
-	return &Env{make(map[string]value), make(map[string]bool), enclosing}
+	e := &Env{make(map[string]value), make(map[string]bool), enclosing, nil}
+	if enclosing == nil {
+		// means that this created env is the root, that is global env
+		e.globals = e
+	} else {
+		e.globals = enclosing.globals
+	}
+	return e
 }
 
 func (e *Env) defineInit(name string, v value) {
@@ -73,6 +91,7 @@ func (e *Env) assign(name *tokenObj, v value) {
 // interpret
 
 func interpret(stmt []Stmt, env *Env) (err error) {
+	env.defineInit("clock", clockFn{})
 	defer func() {
 		if e := recover(); e != nil {
 			err = e.(RuntimeError)
@@ -83,6 +102,54 @@ func interpret(stmt []Stmt, env *Env) (err error) {
 	}
 	return nil
 }
+
+// ------------------------------------------
+// clockFn
+
+type clockFn struct{}
+
+func (c clockFn) arity() int {
+	return 0
+}
+
+func (c clockFn) call(_ *Env, _ []value) value {
+	return float64(time.Now().UnixNano())
+}
+
+// ------------------------------------------
+// Function
+
+type FunObj struct {
+	decl    *FunStmt
+	closure *Env
+}
+
+func (f *FunObj) arity() int {
+	return len(f.decl.params)
+}
+
+func (f *FunObj) call(e *Env, args []value) (v value) {
+	env := NewEnv(f.closure)
+	for i, p := range f.decl.params {
+		env.defineInit(p.lexeme, args[i])
+	}
+
+	defer func() {
+		if e := recover(); e != nil {
+			// return whatever value is being panicked at us from return stmt
+			v = e.(ReturnHack)
+		}
+	}()
+	execBlock(f.decl.body, env)
+	return nil
+}
+
+func (f *FunObj) String() string {
+	return fmt.Sprintf("<fn %v>", f.decl.name.lexeme)
+}
+
+// ------------------------------------------
+// Expression Eval
 
 func (e *BinaryExpr) eval(env *Env) value {
 	switch e.operator.tok {
@@ -160,6 +227,25 @@ func (e *BinaryExpr) equal(env *Env) bool {
 	return x == y
 }
 
+func (e *CallExpr) eval(env *Env) value {
+	callee := e.callee.eval(env)
+	args := make([]value, 0)
+	for _, a := range e.args {
+		args = append(args, a.eval(env))
+	}
+	if fn, ok := callee.(Callable); ok {
+		if len(args) != fn.arity() {
+			runtimeErr(e.paren,
+				fmt.Sprintf("expected %v arguments but got %v", fn.arity(), len(args)))
+		}
+		return fn.call(env, args)
+	} else {
+		err := fmt.Sprintf("'%v' is not a function or class", callee)
+		runtimeErr(e.paren, err)
+		return nil
+	}
+}
+
 func (e *GroupingExpr) eval(env *Env) value {
 	return e.e.eval(env)
 }
@@ -227,6 +313,11 @@ func (s *ExprStmt) execute(env *Env) {
 	s.expression.eval(env)
 }
 
+func (s *FunStmt) execute(env *Env) {
+	fn := &FunObj{decl: s, closure: NewEnv(env)}
+	env.defineInit(s.name.lexeme, fn)
+}
+
 func (s *PrintStmt) execute(env *Env) {
 	v := s.expression.eval(env)
 	fmt.Println(v)
@@ -258,6 +349,15 @@ func (s *IfStmt) execute(env *Env) {
 	} else if s.b != nil {
 		s.b.execute(env)
 	}
+}
+
+func (s *ReturnStmt) execute(env *Env) {
+	var v value
+	if s.value != nil {
+		v = s.value.eval(env)
+	}
+	// Ugly hack, panic to unwind the stack back to the call
+	panic(ReturnHack(v))
 }
 
 func (s *WhileStmt) execute(env *Env) {

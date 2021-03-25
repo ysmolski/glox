@@ -1,0 +1,41 @@
+fun count(n) {
+	if (n > 1)
+		count(n - 1);
+	print n;
+}
+print count;
+count(3);
+
+
+fun sayHi(first, last) {
+	print "Hi, " + first + " " + last + "!";
+}
+sayHi("Dear", "Author");
+
+
+fun count(n) {
+  while (n < 100) {
+    if (n == 3) return n; // <--
+    print n;
+    n = n + 1;
+  }
+}
+
+count(1); // should produce 1, 2
+
+print "";
+print "closure";
+
+fun makeCounter() {
+  var i = 0;
+  fun count() {
+    i = i + 1;
+    print i;
+  }
+
+  return count;
+}
+
+var counter = makeCounter();
+counter(); // "1".
+counter(); // "2".

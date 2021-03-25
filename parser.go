@@ -6,8 +6,14 @@ import "fmt"
 //
 // program        -> declaration* EOF ;
 //
-// declaration    -> varDecl
+// declaration    -> funDecl
+//                 | varDecl
 //                 | statement ;
+//
+// funDecl        -> "fun" function ;
+// function       -> IDENTIFIER "(" parameters? ")" block ;
+//
+// parameters     -> IDENTIFIER ( "," IDENTIFIER )* ;
 //
 // varDecl        -> "var" IDENTIFIER ( "=" expression )? ";" ;
 //
@@ -15,6 +21,7 @@ import "fmt"
 //                 | forStmt
 //                 | ifStmt
 //                 | printStmt
+//                 | returnStmt
 //                 | whileStmt
 //				   | block ;
 //
@@ -24,6 +31,7 @@ import "fmt"
 //                   expression? ";"
 //                   expression? ")" statement ;
 // ifStmt         -> "if" "(" expression ")" statement ( "else" statement )? ;
+// returnStmt     -> "return" expression? ";" ;
 // whileStmt      -> "while" "(" expression ")" statement ;
 // block		  -> "{" declaration* "}" ;
 //
@@ -36,8 +44,9 @@ import "fmt"
 // comparison     -> term ( ( ">" | ">=" | "<" | "<=" ) term )* ;
 // term           -> factor ( ( "-" | "+" ) factor )* ;
 // factor         -> unary ( ( "/" | "*" ) unary )* ;
-// unary          -> ( "!" | "-" ) unary
-//                 | primary ;
+// unary          -> ( "!" | "-" ) unary | call ;
+// call			  -> primary ( "(" arguments? ")" )* ;
+// arguments      -> expression ( "," expression )* ;
 // primary        -> NUMBER | STRING | "true" | "false" | "nil"
 //                 | "(" expression ")"
 //                 | IDENTIFIER ;
@@ -155,10 +164,34 @@ func (p *parser) declaration() (s Stmt) {
 			s = nil
 		}
 	}()
+	if p.match(Fun) {
+		return p.funDecl("function")
+	}
 	if p.match(Var) {
 		return p.varDecl()
 	}
 	return p.statement()
+}
+
+func (p *parser) funDecl(kind string) Stmt {
+	name := p.consume(Identifier, "expected "+kind+" name")
+	p.consume(LeftParen, "expected '(' after "+kind+" name")
+	params := make([]*tokenObj, 0)
+	if !p.check(RightParen) {
+		for {
+			if len(params) >= 255 {
+				p.yerror(p.peek(), "can't have more than 255 parameters")
+			}
+			params = append(params, p.consume(Identifier, "expected parameter name"))
+			if !p.match(Comma) {
+				break
+			}
+		}
+	}
+	p.consume(RightParen, "expected ')' after parameters")
+	p.consume(LeftBrace, "expected '{' after "+kind+" signature")
+	body := p.block()
+	return &FunStmt{name: name, params: params, body: body}
 }
 
 func (p *parser) varDecl() Stmt {
@@ -181,6 +214,9 @@ func (p *parser) statement() Stmt {
 	}
 	if p.match(Print) {
 		return p.printStatement()
+	}
+	if p.match(Return) {
+		return p.returnStatement()
 	}
 	if p.match(While) {
 		return p.whileStatement()
@@ -250,6 +286,16 @@ func (p *parser) printStatement() Stmt {
 	e := p.expression()
 	p.consume(Semicolon, "expected ';' after expression")
 	return &PrintStmt{expression: e}
+}
+
+func (p *parser) returnStatement() Stmt {
+	k := p.prev()
+	var val Expr
+	if !p.check(Semicolon) {
+		val = p.expression()
+	}
+	p.consume(Semicolon, "expected ';' after return value")
+	return &ReturnStmt{keyword: k, value: val}
 }
 
 func (p *parser) whileStatement() Stmt {
@@ -365,7 +411,36 @@ func (p *parser) unary() Expr {
 		right := p.unary()
 		return &UnaryExpr{operator: op, right: right}
 	}
-	return p.primary()
+	return p.call()
+}
+
+func (p *parser) call() Expr {
+	expr := p.primary()
+	for {
+		if p.match(LeftParen) {
+			expr = p.finishCall(expr)
+		} else {
+			break
+		}
+	}
+	return expr
+}
+
+func (p *parser) finishCall(expr Expr) Expr {
+	args := make([]Expr, 0)
+	if !p.check(RightParen) {
+		for {
+			if len(args) >= 255 {
+				p.yerror(p.peek(), "can't have more than 255 arguments")
+			}
+			args = append(args, p.expression())
+			if !p.match(Comma) {
+				break
+			}
+		}
+	}
+	paren := p.consume(RightParen, "expected ')' after arguments")
+	return &CallExpr{callee: expr, paren: paren, args: args}
 }
 
 // primary -> NUMBER | STRING | "true" | "false" | "nil"
